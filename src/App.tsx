@@ -43,7 +43,11 @@ import {
   AlertCircle,
   Filter,
   Send,
-  Award
+  Award,
+  Edit,
+  Home,
+  ClipboardList,
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ai, MODELS } from './lib/gemini';
@@ -51,6 +55,8 @@ import { Exam, Category, Flashcard } from './types';
 import { INITIAL_CATEGORIES, INITIAL_EXAMS } from './constants';
 import RadiologicalCalculator from './components/RadiologicalCalculator';
 import Community from './components/Community';
+import DailyReports from './components/DailyReports';
+import RadiographicSimulator from './components/RadiographicSimulator';
 
 const ICON_MAP = {
   Brain,
@@ -65,7 +71,7 @@ const ICON_MAP = {
   PersonStanding
 };
 
-type View = 'home' | 'skeleton' | 'category-list' | 'exam-detail' | 'study' | 'add-exam' | 'favorites' | 'add-category' | 'tools' | 'community' | 'profile';
+type View = 'home' | 'skeleton' | 'category-list' | 'exam-detail' | 'study' | 'add-exam' | 'favorites' | 'add-category' | 'tools' | 'community' | 'profile' | 'edit-category' | 'edit-exam' | 'daily-reports' | 'simulator';
 
 export default function App() {
   // Persistence
@@ -93,6 +99,11 @@ export default function App() {
 
   const [videoLessons, setVideoLessons] = useState<{ id: string, title: string, url: string }[]>(() => {
     const saved = localStorage.getItem('trl_video_lessons');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [dailyReports, setDailyReports] = useState<any[]>(() => {
+    const saved = localStorage.getItem('trl_daily_reports');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -135,16 +146,24 @@ export default function App() {
     localStorage.setItem('trl_video_lessons', JSON.stringify(videoLessons));
   }, [videoLessons]);
 
+  useEffect(() => {
+    localStorage.setItem('trl_daily_reports', JSON.stringify(dailyReports));
+  }, [dailyReports]);
+
   // Navigation and Selection
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const studyFileInputRef = useRef<HTMLInputElement>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showStudyModal, setShowStudyModal] = useState(false);
   const [videoLinkData, setVideoLinkData] = useState({ title: '', url: '' });
+  const [studyInputData, setStudyInputData] = useState({ title: '', url: '' });
 
   // Derived State
   const filteredExams = useMemo(() => {
@@ -203,9 +222,9 @@ export default function App() {
   };
 
   const goBack = () => {
-    if (currentView === 'exam-detail') {
+    if (currentView === 'exam-detail' || currentView === 'edit-exam') {
       setCurrentView('category-list');
-    } else if (currentView === 'category-list' || currentView === 'skeleton' || currentView === 'study' || currentView === 'add-exam' || currentView === 'favorites') {
+    } else if (currentView === 'category-list' || currentView === 'skeleton' || currentView === 'study' || currentView === 'add-exam' || currentView === 'favorites' || currentView === 'edit-category' || currentView === 'add-category' || currentView === 'tools' || currentView === 'community' || currentView === 'profile' || currentView === 'daily-reports' || currentView === 'simulator') {
       setCurrentView('home');
     }
   };
@@ -269,7 +288,11 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check if it's a PDF or Ebook type if we want, but let's be flexible
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Arquivo muito grande. O limite para armazenamento local é de 2MB. Tente usar um link direto.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const b64 = event.target?.result as string;
@@ -277,14 +300,27 @@ export default function App() {
         setStudyMaterials(prev => [...prev, { 
           id: Math.random().toString(36).substr(2, 9), 
           title: file.name, 
-          url: b64,
-          type: 'local'
+          url: b64
         }]);
+        setShowStudyModal(false);
       }
     };
     reader.readAsDataURL(file);
-    // Reset input
     e.target.value = '';
+  };
+
+  const handleAddStudyLink = () => {
+    if (studyInputData.title && studyInputData.url) {
+      setStudyMaterials(prev => [...prev, { 
+        id: Math.random().toString(36).substr(2, 9), 
+        title: studyInputData.title, 
+        url: studyInputData.url 
+      }]);
+      setStudyInputData({ title: '', url: '' });
+      setShowStudyModal(false);
+    } else {
+      alert('Por favor, preencha o título e o link/arquivo.');
+    }
   };
 
   const handleAddVideoLink = () => {
@@ -330,14 +366,46 @@ export default function App() {
     const icon = formData.get('icon') as string;
 
     if (name) {
-      const newCat: Category = {
-        id: name.toLowerCase().replace(/\s+/g, '-'),
-        name,
-        icon: icon || 'PersonStanding'
-      };
-      setCategories(prev => [...prev, newCat]);
+      if (editingCategory) {
+        setCategories(prev => prev.map(c => 
+          c.id === editingCategory.id ? { ...c, name, icon: icon || c.icon } : c
+        ));
+        setEditingCategory(null);
+      } else {
+        const newCat: Category = {
+          id: name.toLowerCase().replace(/\s+/g, '-'),
+          name,
+          icon: icon || 'PersonStanding'
+        };
+        setCategories(prev => [...prev, newCat]);
+      }
       setCurrentView('home');
     }
+  };
+
+  const handleEditExam = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingExam) return;
+    
+    const formData = new FormData(e.currentTarget);
+    const updatedExam: Exam = {
+      ...editingExam,
+      name: formData.get('name') as string,
+      category: formData.get('category') as string,
+      positioning: formData.get('positioning') as string,
+      incidences: formData.get('incidences') as string,
+      angulation: formData.get('angulation') as string,
+      ffd: formData.get('ffd') as string,
+      kv: formData.get('kv') as string,
+      mas: formData.get('mas') as string,
+      observations: formData.get('observations') as string,
+      type: formData.get('type') as Exam['type'],
+    };
+    
+    setExams(prev => prev.map(e => e.id === editingExam.id ? updatedExam : e));
+    setEditingExam(null);
+    setCurrentView('exam-detail');
+    setSelectedExamId(updatedExam.id);
   };
 
   // Components for simplified rendering
@@ -352,18 +420,31 @@ export default function App() {
     <header className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border-main px-4 py-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <AnimatePresence mode="wait">
-          {currentView !== 'home' ? (
-            <motion.button 
-              key="back-btn"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              onClick={goBack} 
-              className="p-2 hover:bg-bg-app rounded-lg transition-colors border border-border-main"
-            >
-              <ArrowLeft size={18} className="text-text-main" />
-            </motion.button>
-          ) : (
+          {currentView !== 'home' && (
+            <div className="flex gap-2">
+              <motion.button 
+                key="back-btn"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={goBack} 
+                className="p-2 hover:bg-bg-app rounded-lg transition-all border border-border-main active:scale-95 shadow-sm"
+              >
+                <ArrowLeft size={18} className="text-text-main" />
+              </motion.button>
+              <motion.button 
+                key="home-btn"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={() => setCurrentView('home')} 
+                className="p-2 hover:bg-bg-app rounded-lg transition-all border border-border-main active:scale-95 shadow-sm"
+              >
+                <Home size={18} className="text-text-main" />
+              </motion.button>
+            </div>
+          )}
+          {currentView === 'home' && (
             <motion.div 
               key="logo-icon"
               initial={{ opacity: 0, scale: 0.8 }}
@@ -398,6 +479,10 @@ export default function App() {
                currentView === 'tools' ? 'Calculadora Téc.' :
                currentView === 'community' ? 'Comunidade' :
                currentView === 'profile' ? 'Perfil Profissional' :
+               currentView === 'daily-reports' ? 'Relatório diário' :
+               currentView === 'simulator' ? 'Simulador Técnico' :
+               currentView === 'edit-category' ? 'Editar Região' :
+               currentView === 'edit-exam' ? 'Editar Exame' :
                currentView === 'favorites' ? 'Meus Favoritos' : 'Novo Registro'}
             </motion.h1>
           </AnimatePresence>
@@ -458,6 +543,37 @@ export default function App() {
                 </div>
               </button>
 
+              {/* Modules Quick Access */}
+              <section className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setCurrentView('tools')}
+                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <Calculator size={20} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Calculadoras</span>
+                </button>
+                <button 
+                  onClick={() => setCurrentView('daily-reports')}
+                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                    <ClipboardList size={20} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Relatório diário</span>
+                </button>
+                <button 
+                  onClick={() => setCurrentView('simulator')}
+                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                    <Target size={20} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Simulador</span>
+                </button>
+              </section>
+
               {/* Categories Grid */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -481,12 +597,20 @@ export default function App() {
                           </div>
                           <span className="font-semibold text-text-main text-sm">{cat.name}</span>
                         </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}
-                          className="absolute -top-1 -right-1 p-1 bg-white border border-border-main text-text-light hover:text-danger rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                        >
-                          <X size={12} />
-                        </button>
+                        <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setEditingCategory(cat); setCurrentView('edit-category'); }}
+                            className="p-1.5 bg-white border border-border-main text-primary hover:text-accent rounded-full shadow-md"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}
+                            className="p-1.5 bg-white border border-border-main text-text-light hover:text-danger rounded-full shadow-md"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -561,12 +685,20 @@ export default function App() {
                         </div>
                         <ChevronRight size={16} className="text-border-main" />
                       </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); deleteExam(exam.id); }}
-                        className="absolute -top-1 -right-1 p-1 bg-white shadow-sm border border-border-main text-text-light hover:text-danger rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                        <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setEditingExam(exam); setCurrentView('edit-exam'); }}
+                            className="p-1 bg-white shadow-sm border border-border-main text-primary hover:text-accent rounded-full"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); deleteExam(exam.id); }}
+                            className="p-1 bg-white shadow-sm border border-border-main text-text-light hover:text-danger rounded-full"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                     </div>
                   ))}
                 </div>
@@ -600,14 +732,30 @@ export default function App() {
                   <h2 className="text-2xl font-black text-text-main leading-none mt-2">{selectedExam.name}</h2>
                   <p className="text-sm text-text-light font-medium tracking-tight mt-1">Região: {categories.find(c => c.id === selectedExam.category)?.name}</p>
                 </div>
-                <button 
-                  onClick={() => toggleFavorite(selectedExam.id)}
-                  className={`p-3 rounded-2xl shadow-sm border transition-all ${
-                    favorites.includes(selectedExam.id) ? 'bg-danger/5 border-danger/10 text-danger' : 'bg-white border-border-main text-text-light'
-                  }`}
-                >
-                  <Heart size={20} fill={favorites.includes(selectedExam.id) ? "currentColor" : "none"} />
-                </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => { setEditingExam(selectedExam); setCurrentView('edit-exam'); }}
+                      className="p-3 bg-white border border-border-main rounded-2xl shadow-sm text-text-light hover:text-primary transition-all active:scale-95"
+                      title="Editar Exame"
+                    >
+                      <Edit size={20} />
+                    </button>
+                    <button 
+                      onClick={() => deleteExam(selectedExam.id)}
+                      className="p-3 bg-white border border-border-main rounded-2xl shadow-sm text-text-light hover:text-danger transition-all active:scale-95"
+                      title="Excluir Exame"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                    <button 
+                      onClick={() => toggleFavorite(selectedExam.id)}
+                      className={`p-3 rounded-2xl shadow-sm border transition-all active:scale-95 ${
+                        favorites.includes(selectedExam.id) ? 'bg-danger/5 border-danger/10 text-danger' : 'bg-white border-border-main text-text-light'
+                      }`}
+                    >
+                      <Heart size={20} fill={favorites.includes(selectedExam.id) ? "currentColor" : "none"} />
+                    </button>
+                  </div>
               </div>
 
               {/* Image Space */}
@@ -870,7 +1018,7 @@ export default function App() {
                   type="file" 
                   ref={studyFileInputRef} 
                   className="hidden" 
-                  accept=".pdf, .epub, .doc, .docx"
+                  accept=".pdf, .epub, .doc, .docx, .jpg, .png"
                   onChange={handleStudyFileUpload}
                 />
 
@@ -878,11 +1026,11 @@ export default function App() {
                   <h2 className="text-[11px] font-bold text-text-light uppercase tracking-[0.1em]">Material Complementar</h2>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => studyFileInputRef.current?.click()}
+                      onClick={() => setShowStudyModal(true)}
                       className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-                      title="Abrir meus arquivos"
+                      title="Anexar Material"
                     >
-                      <FileText size={18} />
+                      <Plus size={18} />
                     </button>
                     <button 
                       onClick={() => setShowVideoModal(true)}
@@ -893,6 +1041,82 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* Study Material Modal */}
+                <AnimatePresence>
+                  {showStudyModal && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6"
+                    >
+                      <motion.div 
+                        initial={{ scale: 0.9, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.9, y: 20 }}
+                        className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl space-y-6"
+                      >
+                        <div className="flex items-center gap-3 text-primary">
+                          <FileText size={24} />
+                          <h3 className="text-lg font-black tracking-tight">Novo Material</h3>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <button 
+                            onClick={() => studyFileInputRef.current?.click()}
+                            className="w-full py-4 border-2 border-dashed border-primary/20 rounded-xl flex flex-col items-center gap-2 hover:bg-primary/5 transition-colors group"
+                          >
+                            <Plus size={24} className="text-primary group-hover:scale-110 transition-transform" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Anexar dos meus arquivos</span>
+                          </button>
+
+                          <div className="relative flex items-center gap-2 py-2">
+                            <div className="flex-1 h-px bg-border-main"></div>
+                            <span className="text-[9px] font-black text-text-light uppercase tracking-widest">ou use um link</span>
+                            <div className="flex-1 h-px bg-border-main"></div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Título</label>
+                            <input 
+                              type="text"
+                              value={studyInputData.title}
+                              onChange={(e) => setStudyInputData(prev => ({ ...prev, title: e.target.value }))}
+                              className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" 
+                              placeholder="Ex: Guia de Posicionamento PDF" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Link Direto (URL)</label>
+                            <input 
+                              type="text"
+                              value={studyInputData.url}
+                              onChange={(e) => setStudyInputData(prev => ({ ...prev, url: e.target.value }))}
+                              className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" 
+                              placeholder="https://meus-arquivos.com/doc.pdf" 
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                          <button 
+                            onClick={() => setShowStudyModal(false)}
+                            className="flex-1 py-4 bg-bg-app border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            onClick={handleAddStudyLink}
+                            className="flex-1 py-4 bg-primary text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20"
+                          >
+                            Salvar Material
+                          </button>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Video Lesson Modal */}
                 <AnimatePresence>
@@ -1080,6 +1304,166 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentView === 'daily-reports' && (
+            <motion.div 
+              key="daily-reports"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <DailyReports 
+                reports={dailyReports}
+                setReports={setDailyReports}
+              />
+            </motion.div>
+          )}
+
+          {currentView === 'edit-category' && editingCategory && (
+            <motion.div 
+              key="edit-category"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="space-y-6 pb-24"
+            >
+              <form onSubmit={handleAddCategory} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Nome da Região</label>
+                  <input name="name" required defaultValue={editingCategory.name} className="w-full card p-4 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Escolha um Ícone</label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {Object.entries(ICON_MAP).map(([key, IconComponent]) => (
+                      <label key={key} className="cursor-pointer group">
+                        <input type="radio" name="icon" value={key} className="hidden peer" defaultChecked={editingCategory.icon === key} />
+                        <div className="w-full aspect-square rounded-xl bg-white border border-border-main flex items-center justify-center text-text-light peer-checked:bg-primary/10 peer-checked:border-primary peer-checked:text-primary transition-all group-hover:bg-slate-50">
+                          <IconComponent size={24} />
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => { setEditingCategory(null); setCurrentView('home'); }}
+                    className="flex-1 py-4 bg-white border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-4 bg-primary text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {currentView === 'edit-exam' && editingExam && (
+            <motion.div 
+              key="edit-exam"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="space-y-6 pb-24"
+            >
+              <form onSubmit={handleEditExam} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Nome do Exame</label>
+                  <input name="name" required defaultValue={editingExam.name} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Região</label>
+                    <select name="category" required defaultValue={editingExam.category} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Tipo</label>
+                    <select name="type" required defaultValue={editingExam.type} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                      <option value="rotina">Rotina</option>
+                      <option value="especial">Especial</option>
+                      <option value="odontologico">Odontológico</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Posicionamento</label>
+                  <textarea name="positioning" required defaultValue={editingExam.positioning} rows={3} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">DFF (cm)</label>
+                    <input name="ffd" required defaultValue={editingExam.ffd} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-black text-primary" />
+                  </div>
+                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">KV</label>
+                    <input name="kv" required defaultValue={editingExam.kv} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-black text-primary" />
+                  </div>
+                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">mAs</label>
+                    <input name="mas" required defaultValue={editingExam.mas} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-black text-primary" />
+                  </div>
+                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Angulação</label>
+                    <input name="angulation" required defaultValue={editingExam.angulation} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-black text-primary" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Incidências</label>
+                  <input name="incidences" required defaultValue={editingExam.incidences} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Observações Técnicas</label>
+                  <textarea name="observations" defaultValue={editingExam.observations} rows={2} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium" />
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => { setEditingExam(null); setCurrentView('exam-detail'); }}
+                    className="flex-1 py-4 bg-white border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="w-full bg-primary text-white font-black uppercase tracking-[0.2em] py-5 rounded-2xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all text-xs"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {currentView === 'simulator' && (
+            <motion.div 
+              key="simulator"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <RadiographicSimulator />
+            </motion.div>
+          )}
+
           {currentView === 'add-exam' && (
             <motion.div 
               key="add-exam"
@@ -1238,13 +1622,24 @@ export default function App() {
         <div className="relative -top-5 px-1">
            <motion.button 
             whileTap={{ scale: 0.9 }}
-            onClick={() => setCurrentView('add-exam')}
+            onClick={() => setCurrentView('home')}
             className="w-12 h-12 rounded-2xl bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center transition-all border-4 border-card"
           >
-            <Plus size={24} strokeWidth={3} />
+            <Home size={24} strokeWidth={3} />
           </motion.button>
         </div>
 
+        <motion.button 
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setCurrentView('simulator')}
+          className={`flex-1 flex flex-col items-center gap-1 py-3 px-1 rounded-2xl transition-all ${
+            currentView === 'simulator' ? 'text-primary bg-primary/5' : 'text-text-light hover:text-text-main'
+          }`}
+        >
+          <Target size={16} />
+          <span className="text-[8px] font-black uppercase tracking-tight">Simul.</span>
+        </motion.button>
+        
         <motion.button 
           whileTap={{ scale: 0.9 }}
           onClick={() => setCurrentView('study')}
