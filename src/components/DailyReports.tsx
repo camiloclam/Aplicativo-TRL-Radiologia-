@@ -79,7 +79,7 @@ export default function DailyReports({
           placeholder="Pesquisar em seus relatórios..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white border border-border-main p-4 pl-12 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+          className="w-full bg-card border border-border-main p-4 pl-12 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none transition-all text-text-main placeholder:text-text-light"
         />
       </div>
 
@@ -92,7 +92,7 @@ export default function DailyReports({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               onClick={() => setEditingReport(report)}
-              className="bg-white border border-border-main p-5 rounded-[2rem] shadow-sm active:scale-[0.98] transition-all cursor-pointer group"
+              className="bg-card border border-border-main p-5 rounded-[2rem] shadow-sm active:scale-[0.98] transition-all cursor-pointer group"
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 text-text-light">
@@ -103,7 +103,7 @@ export default function DailyReports({
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleDelete(report.id); }}
-                  className="p-2 opacity-0 group-hover:opacity-100 text-text-light hover:text-danger transition-all bg-slate-50 rounded-lg"
+                  className="p-2 opacity-0 group-hover:opacity-100 text-text-light hover:text-danger transition-all bg-bg-app rounded-lg"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -118,7 +118,7 @@ export default function DailyReports({
             </motion.div>
           ))
         ) : (
-          <div className="text-center py-12 px-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-border-main">
+          <div className="text-center py-12 px-6 bg-bg-app rounded-[2.5rem] border border-dashed border-border-main">
             <ClipboardList className="mx-auto text-text-light/30 mb-4" size={48} />
             <p className="text-sm text-text-light font-medium">Nenhum relatório encontrado. Comece a documentar sua jornada!</p>
           </div>
@@ -157,7 +157,7 @@ function ReportModal({ report, onClose, onSave }: any) {
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         exit={{ y: 100 }}
-        className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[90vh] border border-border-main"
       >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3 text-primary">
@@ -166,7 +166,7 @@ function ReportModal({ report, onClose, onSave }: any) {
               {report ? 'Editar Nota' : 'Novo Relatório Diário'}
             </h3>
           </div>
-          <button onClick={onClose} className="p-2 bg-slate-100 rounded-xl text-text-light">
+          <button onClick={onClose} className="p-2 bg-bg-app rounded-xl text-text-light">
             <X size={20} />
           </button>
         </div>
@@ -178,7 +178,7 @@ function ReportModal({ report, onClose, onSave }: any) {
               type="date" 
               value={formData.date}
               onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-              className="w-full card p-3 outline-none text-sm font-medium bg-white"
+              className="w-full card p-3 outline-none text-sm font-medium bg-card"
             />
           </div>
 

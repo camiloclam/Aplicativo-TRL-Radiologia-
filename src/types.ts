@@ -13,6 +13,7 @@ export interface Exam {
   type: 'rotina' | 'especial' | 'odontologico';
   imageUrl?: string;
   userObservations?: string[];
+  userImages?: string[];
 }
 
 export interface Category {

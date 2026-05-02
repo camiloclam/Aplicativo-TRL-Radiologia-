@@ -28,6 +28,9 @@ import {
   HelpCircle,
   User,
   Activity,
+  Camera,
+  Book,
+  RotateCw,
   Disc,
   Baby,
   Zap,
@@ -57,6 +60,7 @@ import RadiologicalCalculator from './components/RadiologicalCalculator';
 import Community from './components/Community';
 import DailyReports from './components/DailyReports';
 import RadiographicSimulator from './components/RadiographicSimulator';
+import ImageCropper from './components/ImageCropper';
 
 const ICON_MAP = {
   Brain,
@@ -77,12 +81,36 @@ export default function App() {
   // Persistence
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem('trl_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+    if (!saved) return INITIAL_CATEGORIES;
+    const current = JSON.parse(saved);
+    // Replace existing ones with INITIAL version to get updates, keep others
+    const updated = current.map((c: any) => {
+      const initial = INITIAL_CATEGORIES.find(ic => ic.id === c.id);
+      return initial ? initial : c;
+    });
+    const missing = INITIAL_CATEGORIES.filter(ic => !current.find((c: any) => c.id === ic.id));
+    return [...updated, ...missing];
   });
 
   const [exams, setExams] = useState<Exam[]>(() => {
     const saved = localStorage.getItem('trl_exams');
-    return saved ? JSON.parse(saved) : INITIAL_EXAMS;
+    if (!saved) return INITIAL_EXAMS;
+    const current = JSON.parse(saved);
+    // Replace existing ones with INITIAL version to get updates, keep others
+    const updated = current.map((e: any) => {
+      const initial = INITIAL_EXAMS.find(ie => ie.id === e.id);
+      if (initial) {
+        return {
+          ...initial,
+          userObservations: e.userObservations || [],
+          userImages: e.userImages || [],
+          imageUrl: e.imageUrl || initial.imageUrl
+        };
+      }
+      return e;
+    });
+    const missing = INITIAL_EXAMS.filter(ie => !current.find((e: any) => e.id === ie.id));
+    return [...updated, ...missing];
   });
 
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -159,11 +187,13 @@ export default function App() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userImageInputRef = useRef<HTMLInputElement>(null);
   const studyFileInputRef = useRef<HTMLInputElement>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showStudyModal, setShowStudyModal] = useState(false);
   const [videoLinkData, setVideoLinkData] = useState({ title: '', url: '' });
   const [studyInputData, setStudyInputData] = useState({ title: '', url: '' });
+  const [imageToCrop, setImageToCrop] = useState<{ src: string, type: 'main' | 'user', index?: number } | null>(null);
 
   // Derived State
   const filteredExams = useMemo(() => {
@@ -276,12 +306,59 @@ export default function App() {
     reader.onload = (event) => {
       const b64 = event.target?.result as string;
       if (b64) {
-        setExams(prev => prev.map(e => 
-          e.id === selectedExam.id ? { ...e, imageUrl: b64 } : e
-        ));
+        setImageToCrop({ src: b64, type: 'main' });
       }
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleUserImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; // Get only one for cropping at a time
+    if (!file || !selectedExam) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Imagem muito grande. O limite é de 2MB por arquivo.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      if (b64) {
+        setImageToCrop({ src: b64, type: 'user' });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const onCropComplete = (croppedImage: string) => {
+    if (!imageToCrop || !selectedExam) return;
+
+    if (imageToCrop.type === 'main') {
+      setExams(prev => prev.map(e => 
+        e.id === selectedExam.id ? { ...e, imageUrl: croppedImage } : e
+      ));
+    } else if (imageToCrop.type === 'user' && imageToCrop.index !== undefined) {
+      // Editing existing user image
+      setExams(prev => prev.map(e => 
+        e.id === selectedExam.id 
+          ? { 
+              ...e, 
+              userImages: e.userImages?.map((img, i) => i === imageToCrop.index ? croppedImage : img) 
+            } 
+          : e
+      ));
+    } else {
+      // New user image upload
+      setExams(prev => prev.map(e => 
+        e.id === selectedExam.id 
+          ? { ...e, userImages: [...(e.userImages || []), croppedImage] } 
+          : e
+      ));
+    }
+    setImageToCrop(null);
   };
 
   const handleStudyFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -522,7 +599,7 @@ export default function App() {
                 <input 
                   type="text" 
                   placeholder="Buscar exames ou anatomia..."
-                  className="w-full bg-white border border-border-main rounded-xl py-3 pl-10 pr-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                  className="w-full bg-card border border-border-main rounded-xl py-3 pl-10 pr-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-text-main placeholder:text-text-light"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => { if(searchQuery) setCurrentView('category-list') }}
@@ -547,7 +624,7 @@ export default function App() {
               <section className="grid grid-cols-2 gap-4">
                 <button 
                   onClick={() => setCurrentView('tools')}
-                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
                 >
                   <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                     <Calculator size={20} />
@@ -556,21 +633,45 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => setCurrentView('daily-reports')}
-                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-orange-950/30 text-orange-400 flex items-center justify-center">
                     <ClipboardList size={20} />
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Relatório diário</span>
                 </button>
                 <button 
                   onClick={() => setCurrentView('simulator')}
-                  className="bg-white border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-green-950/30 text-green-400 flex items-center justify-center">
                     <Target size={20} />
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Simulador</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const kitGripe = categories.find(c => c.id === 'kit-gripe');
+                    if (kitGripe) navigateToCategory(kitGripe);
+                  }}
+                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-red-950/30 text-red-400 flex items-center justify-center">
+                    <Activity size={20} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Kit Gripe</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const densito = categories.find(c => c.id === 'densitometria');
+                    if (densito) navigateToCategory(densito);
+                  }}
+                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-950/30 text-blue-400 flex items-center justify-center">
+                    <Accessibility size={20} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Densitometria</span>
                 </button>
               </section>
 
@@ -590,7 +691,7 @@ export default function App() {
                       <div key={cat.id} className="relative group">
                          <button 
                           onClick={() => navigateToCategory(cat)}
-                          className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-50 transition-all text-center border-border-main"
+                          className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-800 transition-all text-center border-border-main"
                         >
                           <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
                             <Icon size={24} />
@@ -600,13 +701,13 @@ export default function App() {
                         <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={(e) => { e.stopPropagation(); setEditingCategory(cat); setCurrentView('edit-category'); }}
-                            className="p-1.5 bg-white border border-border-main text-primary hover:text-accent rounded-full shadow-md"
+                            className="p-1.5 bg-card border border-border-main text-primary hover:text-accent rounded-full shadow-md"
                           >
                             <Edit size={12} />
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}
-                            className="p-1.5 bg-white border border-border-main text-text-light hover:text-danger rounded-full shadow-md"
+                            className="p-1.5 bg-card border border-border-main text-text-light hover:text-danger rounded-full shadow-md"
                           >
                             <X size={12} />
                           </button>
@@ -674,8 +775,8 @@ export default function App() {
                         className="w-full card p-4 flex items-center gap-4 text-left active:bg-slate-50 border-l-4 border-l-transparent hover:border-l-primary transition-all"
                       >
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border border-border-main ${
-                          exam.type === 'rotina' ? 'bg-primary/5 text-primary' : 
-                          exam.type === 'especial' ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600'
+                          exam.type === 'rotina' ? 'bg-primary/10 text-primary' : 
+                          exam.type === 'especial' ? 'bg-amber-950/30 text-amber-500' : 'bg-purple-950/30 text-purple-500'
                         }`}>
                           <BookOpen size={20} />
                         </div>
@@ -688,13 +789,13 @@ export default function App() {
                         <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={(e) => { e.stopPropagation(); setEditingExam(exam); setCurrentView('edit-exam'); }}
-                            className="p-1 bg-white shadow-sm border border-border-main text-primary hover:text-accent rounded-full"
+                            className="p-1 bg-card shadow-sm border border-border-main text-primary hover:text-accent rounded-full"
                           >
                             <Edit size={12} />
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); deleteExam(exam.id); }}
-                            className="p-1 bg-white shadow-sm border border-border-main text-text-light hover:text-danger rounded-full"
+                            className="p-1 bg-card shadow-sm border border-border-main text-text-light hover:text-danger rounded-full"
                           >
                             <Trash2 size={12} />
                           </button>
@@ -735,14 +836,14 @@ export default function App() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => { setEditingExam(selectedExam); setCurrentView('edit-exam'); }}
-                      className="p-3 bg-white border border-border-main rounded-2xl shadow-sm text-text-light hover:text-primary transition-all active:scale-95"
+                      className="p-3 bg-card border border-border-main rounded-2xl shadow-sm text-text-light hover:text-primary transition-all active:scale-95"
                       title="Editar Exame"
                     >
                       <Edit size={20} />
                     </button>
                     <button 
                       onClick={() => deleteExam(selectedExam.id)}
-                      className="p-3 bg-white border border-border-main rounded-2xl shadow-sm text-text-light hover:text-danger transition-all active:scale-95"
+                      className="p-3 bg-card border border-border-main rounded-2xl shadow-sm text-text-light hover:text-danger transition-all active:scale-95"
                       title="Excluir Exame"
                     >
                       <Trash2 size={20} />
@@ -750,7 +851,7 @@ export default function App() {
                     <button 
                       onClick={() => toggleFavorite(selectedExam.id)}
                       className={`p-3 rounded-2xl shadow-sm border transition-all active:scale-95 ${
-                        favorites.includes(selectedExam.id) ? 'bg-danger/5 border-danger/10 text-danger' : 'bg-white border-border-main text-text-light'
+                        favorites.includes(selectedExam.id) ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-card border-border-main text-text-light'
                       }`}
                     >
                       <Heart size={20} fill={favorites.includes(selectedExam.id) ? "currentColor" : "none"} />
@@ -759,59 +860,81 @@ export default function App() {
               </div>
 
               {/* Image Space */}
-              <div className="space-y-3">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept="image/*" 
-                  onChange={handleFileUpload} 
-                />
-                <div className="aspect-video bg-bg-app rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center text-text-light overflow-hidden relative group">
-                  {selectedExam.imageUrl ? (
-                    <img src={selectedExam.imageUrl} alt={selectedExam.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-3">
-                      {isGeneratingImage ? (
-                        <div className="flex flex-col items-center space-y-4">
-                          <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse">Gerando Imagem com IA...</p>
+              <div className="px-1">
+                <div className="space-y-3 max-w-2xl mx-auto">
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileUpload} 
+                  />
+                  <div className="aspect-video bg-bg-app rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center text-text-light overflow-hidden relative group shadow-sm transition-all hover:border-primary/30">
+                    {selectedExam.imageUrl ? (
+                      <div className="relative w-full h-full">
+                        <img src={selectedExam.imageUrl} alt={selectedExam.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setImageToCrop({ src: selectedExam.imageUrl!, type: 'main' })}
+                              className="bg-white/20 backdrop-blur-md text-white p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest hover:bg-white/40 transition-all border border-white/20"
+                            >
+                              <RotateCw size={16} /> Ajustar
+                            </button>
+                            <button 
+                              onClick={() => setExams(prev => prev.map(e => e.id === selectedExam.id ? { ...e, imageUrl: undefined } : e))}
+                              className="bg-red-500/80 backdrop-blur-md text-white p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg"
+                            >
+                              <Trash2 size={16} /> Excluir
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="bg-white text-primary p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 transition-all"
+                            >
+                              <Plus size={16} /> Substituir
+                            </button>
+                            <button 
+                              onClick={handleGenerateAIImage}
+                              className="bg-primary text-white p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 transition-all"
+                            >
+                              <Zap size={16} /> Nova IA
+                            </button>
+                          </div>
                         </div>
-                      ) : (
-                        <>
-                          <ImageIcon size={40} className="opacity-20 text-primary" />
-                          <p className="text-[11px] font-bold uppercase tracking-widest text-text-light">Sem imagem ilustrativa</p>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {!isGeneratingImage && (
-                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-white text-primary p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 transition-transform"
-                      >
-                        <Plus size={16} /> Carregar Foto
-                      </button>
-                      <button 
-                        onClick={handleGenerateAIImage}
-                        className="bg-primary text-white p-3 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 transition-transform"
-                      >
-                        <Zap size={16} /> Gerar com IA
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {selectedExam.imageUrl && (
-                  <div className="flex justify-center">
-                    <button 
-                      onClick={() => setExams(prev => prev.map(e => e.id === selectedExam.id ? { ...e, imageUrl: undefined } : e))}
-                      className="text-[10px] font-black uppercase tracking-widest text-danger hover:underline"
-                    >
-                      Remover Imagem
-                    </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3">
+                        {isGeneratingImage ? (
+                          <div className="flex flex-col items-center space-y-4">
+                            <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse">Gerando Imagem com IA...</p>
+                          </div>
+                        ) : (
+                          <>
+                            <ImageIcon size={40} className="opacity-20 text-primary" />
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-text-light">Sem imagem ilustrativa</p>
+                            <div className="flex gap-2 mt-2">
+                              <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="bg-white border border-border-main text-primary px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all"
+                              >
+                                Carregar Foto
+                              </button>
+                              <button 
+                                onClick={handleGenerateAIImage}
+                                className="bg-primary text-white px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm hover:bg-accent transition-all"
+                              >
+                                Gerar com IA
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Technical Grid */}
@@ -874,17 +997,88 @@ export default function App() {
                     <h5 className="text-[11px] font-black text-primary uppercase tracking-[0.15em]">
                       Minhas Notas
                     </h5>
-                    <button onClick={() => alert('Add note')} className="text-accent text-[11px] font-black uppercase tracking-widest">+ Adicionar</button>
+                    <button onClick={() => {
+                      const note = prompt('Nova nota:');
+                      if (note) {
+                        setExams(prev => prev.map(e => 
+                          e.id === selectedExam.id ? { ...e, userObservations: [...(e.userObservations || []), note] } : e
+                        ));
+                      }
+                    }} className="text-accent text-[11px] font-black uppercase tracking-widest">+ Adicionar Nota</button>
                   </div>
                   <div className="space-y-2">
                     {selectedExam.userObservations?.length ? (
                       selectedExam.userObservations.map((note, idx) => (
-                        <div key={idx} className="bg-white border border-border-main rounded-xl p-3 text-sm text-text-main shadow-sm">
-                          {note}
+                        <div key={idx} className="bg-card border border-border-main rounded-xl p-3 text-sm text-text-main shadow-sm flex justify-between items-start gap-2 group">
+                          <span className="flex-1">{note}</span>
+                          <button 
+                            onClick={() => setExams(prev => prev.map(e => 
+                              e.id === selectedExam.id ? { ...e, userObservations: e.userObservations?.filter((_, i) => i !== idx) } : e
+                            ))}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-danger hover:text-red-600"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       ))
                     ) : (
                       <p className="text-[11px] italic text-text-light text-center py-4">Nenhuma observação pessoal adicionada ainda.</p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-3 px-1">
+                  <div className="flex items-center justify-between border-b border-border-main pb-2">
+                    <h5 className="text-[11px] font-black text-primary uppercase tracking-[0.15em]">
+                      Imagens do Usuário
+                    </h5>
+                    <div className="flex gap-3">
+                      <input 
+                        type="file" 
+                        ref={userImageInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        multiple
+                        onChange={handleUserImageUpload}
+                      />
+                      <button 
+                        onClick={() => userImageInputRef.current?.click()}
+                        className="text-accent text-[11px] font-black uppercase tracking-widest flex items-center gap-1 hover:underline decoration-accent/30 underline-offset-4"
+                      >
+                        <Plus size={14} /> Acrescentar imagem
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {selectedExam.userImages?.length ? (
+                      selectedExam.userImages.map((img, idx) => (
+                        <div key={idx} className="relative w-[calc(50%-6px)] aspect-square rounded-xl overflow-hidden border border-border-main group shadow-sm bg-bg-app">
+                          <img src={img} className="w-full h-full object-cover" alt={`Minha imagem ${idx + 1}`} />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button 
+                              onClick={() => setImageToCrop({ src: img, type: 'user', index: idx })}
+                              className="p-2 bg-white/20 backdrop-blur-md rounded-xl text-white hover:bg-white/40 transition-all border border-white/20"
+                              title="Ajustar"
+                            >
+                              <RotateCw size={14} />
+                            </button>
+                            <button 
+                              onClick={() => setExams(prev => prev.map(e => 
+                                e.id === selectedExam.id ? { ...e, userImages: e.userImages?.filter((_, i) => i !== idx) } : e
+                              ))}
+                              className="p-2 bg-red-500/80 backdrop-blur-md rounded-xl text-white hover:bg-red-600 transition-all"
+                              title="Excluir"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="w-full text-center py-10 border border-dashed border-border-main rounded-2xl bg-bg-app/50">
+                         <Camera className="mx-auto text-text-light/20 mb-2" size={32} />
+                         <p className="text-[10px] font-bold uppercase tracking-widest text-text-light/60">Nenhuma imagem carregada</p>
+                      </div>
                     )}
                   </div>
                 </section>
@@ -916,7 +1110,7 @@ export default function App() {
                     {/* Head */}
                     <button 
                       onClick={() => navigateToCategory(categories.find(c => c.id === 'cranio')!)}
-                      className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-sm border border-border-main shadow-lg flex items-center justify-center text-text-light hover:text-primary hover:border-primary hover:shadow-primary/20 hover:scale-110 transition-all relative z-10"
+                      className="w-16 h-16 rounded-full bg-card/80 backdrop-blur-sm border border-border-main shadow-lg flex items-center justify-center text-text-light hover:text-primary hover:border-primary hover:shadow-primary/20 hover:scale-110 transition-all relative z-10"
                     >
                       <Brain size={24} />
                     </button>
@@ -925,23 +1119,23 @@ export default function App() {
                     <div className="flex gap-4">
                       <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'torax')!)}
-                         className="w-16 h-24 rounded-2xl bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
+                         className="w-16 h-24 rounded-2xl bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
                       >
                          <Stethoscope size={24} />
                       </button>
                        <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'coluna')!)}
-                         className="w-12 h-32 rounded-full bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
+                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
                       >
                          <PersonStanding size={24} />
                       </button>
                     </div>
 
                     {/* Arms */}
-                    <div className="absolute top-28 left-0 flex flex-col -ml-12 items-center rotate-[20deg]">
+                     <div className="absolute top-28 left-0 flex flex-col -ml-12 items-center rotate-[20deg]">
                        <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-superiores')!)}
-                         className="w-12 h-32 rounded-full bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
+                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
                       >
                          <Hand size={24} />
                       </button>
@@ -949,7 +1143,7 @@ export default function App() {
                     <div className="absolute top-28 right-0 flex flex-col -mr-12 items-center rotate-[-20deg]">
                        <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-superiores')!)}
-                         className="w-12 h-32 rounded-full bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
+                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
                       >
                          <Hand size={24} />
                       </button>
@@ -959,13 +1153,13 @@ export default function App() {
                     <div className="flex gap-8 mt-4">
                        <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-inferiores')!)}
-                         className="w-12 h-32 rounded-full bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
+                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
                       >
                          <Footprints size={24} />
                       </button>
                        <button 
                          onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-inferiores')!)}
-                         className="w-12 h-32 rounded-full bg-white border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
+                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
                       >
                          <Footprints size={24} />
                       </button>
@@ -999,7 +1193,7 @@ export default function App() {
                   </div>
 
                   <div className="flex gap-4 w-full">
-                    <button className="flex-1 bg-white border border-border-main py-4 rounded-xl font-black text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app">Não lembro</button>
+                    <button className="flex-1 bg-card border border-border-main py-4 rounded-xl font-black text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app">Não lembro</button>
                     <button className="flex-1 bg-primary text-white py-4 rounded-xl font-black text-[11px] uppercase tracking-widest active:bg-accent transition-colors shadow-lg shadow-primary/10">Eu sabia!</button>
                   </div>
 
@@ -1055,7 +1249,7 @@ export default function App() {
                         initial={{ scale: 0.9, y: 20 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.9, y: 20 }}
-                        className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl space-y-6"
+                        className="bg-card w-full max-w-sm rounded-[2rem] p-8 shadow-2xl space-y-6 border border-border-main"
                       >
                         <div className="flex items-center gap-3 text-primary">
                           <FileText size={24} />
@@ -1131,7 +1325,7 @@ export default function App() {
                         initial={{ scale: 0.9, y: 20 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.9, y: 20 }}
-                        className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl space-y-6"
+                        className="bg-card w-full max-w-sm rounded-[2rem] p-8 shadow-2xl space-y-6 border border-border-main"
                       >
                         <div className="flex items-center gap-3 text-red-600">
                           <Youtube size={24} />
@@ -1182,13 +1376,13 @@ export default function App() {
 
                 <div className="grid grid-cols-1 gap-3">
                   {studyMaterials.length === 0 && videoLessons.length === 0 && (
-                    <p className="text-[11px] italic text-text-light text-center py-8 bg-white rounded-2xl border border-dashed border-border-main">
+                    <p className="text-[11px] italic text-text-light text-center py-8 bg-card rounded-2xl border border-dashed border-border-main">
                       Toque nos ícones acima para arquivar PDFs ou salvar Vídeos.
                     </p>
                   )}
                   
                   {studyMaterials.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 bg-white border border-border-main rounded-xl group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-card border border-border-main rounded-xl group animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <FileText size={20} />
                       </div>
@@ -1214,8 +1408,8 @@ export default function App() {
                   ))}
 
                   {videoLessons.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 bg-white border border-border-main rounded-xl group animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-card border border-border-main rounded-xl group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="w-10 h-10 rounded-lg bg-red-950/30 text-red-500 flex items-center justify-center shrink-0">
                         <Youtube size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1245,12 +1439,12 @@ export default function App() {
               className="space-y-4"
             >
               {favorites.length === 0 ? (
-                <div className="text-center py-20">
-                   <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-300">
+                <div className="text-center py-20 pb-40">
+                   <div className="bg-red-950/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
                     <Heart size={32} />
                   </div>
-                  <h3 className="text-slate-900 font-bold">Nenhum favorito ainda</h3>
-                  <p className="text-slate-500 text-sm mt-1">Clique no coração em um exame para salvá-lo aqui.</p>
+                  <h3 className="text-text-main font-bold">Nenhum favorito ainda</h3>
+                  <p className="text-text-light text-sm mt-1">Clique no coração em um exame para salvá-lo aqui.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1258,16 +1452,16 @@ export default function App() {
                     <button 
                       key={exam.id}
                       onClick={() => navigateToExam(exam)}
-                      className="w-full card p-4 flex items-center gap-4 text-left active:bg-slate-50"
+                      className="w-full card p-4 flex items-center gap-4 text-left active:bg-slate-800"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-red-950/30 text-red-500 flex items-center justify-center shrink-0">
                         <Heart size={20} fill="currentColor" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-slate-900 truncate">{exam.name}</h4>
-                        <p className="text-xs text-slate-500 truncate">{exam.incidences}</p>
+                        <h4 className="font-bold text-text-main truncate">{exam.name}</h4>
+                        <p className="text-xs text-text-light truncate">{exam.incidences}</p>
                       </div>
-                      <ChevronRight size={18} className="text-slate-300" />
+                      <ChevronRight size={18} className="text-border-main" />
                     </button>
                   ))}
                 </div>
@@ -1340,7 +1534,7 @@ export default function App() {
                     {Object.entries(ICON_MAP).map(([key, IconComponent]) => (
                       <label key={key} className="cursor-pointer group">
                         <input type="radio" name="icon" value={key} className="hidden peer" defaultChecked={editingCategory.icon === key} />
-                        <div className="w-full aspect-square rounded-xl bg-white border border-border-main flex items-center justify-center text-text-light peer-checked:bg-primary/10 peer-checked:border-primary peer-checked:text-primary transition-all group-hover:bg-slate-50">
+                        <div className="w-full aspect-square rounded-xl bg-card border border-border-main flex items-center justify-center text-text-light peer-checked:bg-primary/10 peer-checked:border-primary peer-checked:text-primary transition-all group-hover:bg-bg-app">
                           <IconComponent size={24} />
                         </div>
                       </label>
@@ -1352,7 +1546,7 @@ export default function App() {
                   <button 
                     type="button"
                     onClick={() => { setEditingCategory(null); setCurrentView('home'); }}
-                    className="flex-1 py-4 bg-white border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
+                    className="flex-1 py-4 bg-card border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
                   >
                     Cancelar
                   </button>
@@ -1385,13 +1579,13 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Região</label>
-                    <select name="category" required defaultValue={editingExam.category} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                    <select name="category" required defaultValue={editingExam.category} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-card text-text-main text-sm font-medium">
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Tipo</label>
-                    <select name="type" required defaultValue={editingExam.type} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                    <select name="type" required defaultValue={editingExam.type} className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-card text-text-main text-sm font-medium">
                       <option value="rotina">Rotina</option>
                       <option value="especial">Especial</option>
                       <option value="odontologico">Odontológico</option>
@@ -1437,7 +1631,7 @@ export default function App() {
                   <button 
                     type="button"
                     onClick={() => { setEditingExam(null); setCurrentView('exam-detail'); }}
-                    className="flex-1 py-4 bg-white border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
+                    className="flex-1 py-4 bg-card border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
                   >
                     Cancelar
                   </button>
@@ -1482,13 +1676,13 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Região</label>
-                    <select name="category" required className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                    <select name="category" required className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-card text-text-main text-sm font-medium">
                       {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Tipo</label>
-                    <select name="type" required className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-white text-sm font-medium">
+                    <select name="type" required className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary appearance-none bg-card text-text-main text-sm font-medium">
                       <option value="rotina">Rotina</option>
                       <option value="especial">Especial</option>
                       <option value="odontologico">Odontológico</option>
@@ -1557,7 +1751,7 @@ export default function App() {
                     {Object.entries(ICON_MAP).map(([key, IconComponent]) => (
                       <label key={key} className="cursor-pointer group">
                         <input type="radio" name="icon" value={key} className="hidden peer" defaultChecked={key === 'PersonStanding'} />
-                        <div className="w-full aspect-square rounded-xl bg-white border border-border-main flex items-center justify-center text-text-light peer-checked:bg-primary/10 peer-checked:border-primary peer-checked:text-primary transition-all group-hover:bg-slate-50">
+                        <div className="w-full aspect-square rounded-xl bg-card border border-border-main flex items-center justify-center text-text-light peer-checked:bg-primary/10 peer-checked:border-primary peer-checked:text-primary transition-all group-hover:bg-bg-app">
                           <IconComponent size={24} />
                         </div>
                       </label>
@@ -1569,7 +1763,7 @@ export default function App() {
                   <button 
                     type="button"
                     onClick={() => setCurrentView('home')}
-                    className="flex-1 py-4 bg-white border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
+                    className="flex-1 py-4 bg-card border border-border-main rounded-xl font-bold text-[11px] uppercase tracking-widest text-text-light active:bg-bg-app"
                   >
                     Cancelar
                   </button>
@@ -1672,6 +1866,23 @@ export default function App() {
           <span className="text-[8px] font-black uppercase tracking-tight">Favoritos</span>
         </motion.button>
       </nav>
+      
+      {imageToCrop && (
+        <ImageCropper 
+          image={imageToCrop.src} 
+          onCropComplete={onCropComplete} 
+          onDelete={() => {
+            if (!selectedExam) return;
+            if (imageToCrop.type === 'main') {
+              setExams(prev => prev.map(e => e.id === selectedExam.id ? { ...e, imageUrl: undefined } : e));
+            } else if (imageToCrop.type === 'user' && imageToCrop.index !== undefined) {
+              setExams(prev => prev.map(e => e.id === selectedExam.id ? { ...e, userImages: e.userImages?.filter((_, i) => i !== imageToCrop.index) } : e));
+            }
+            setImageToCrop(null);
+          }}
+          onCancel={() => setImageToCrop(null)} 
+        />
+      )}
     </div>
   );
 }

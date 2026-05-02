@@ -163,7 +163,7 @@ export default function RadiographicSimulator() {
     return (
       <div className="space-y-6">
         <div className="bg-primary/10 border border-primary/20 p-6 rounded-[2.5rem] flex flex-col items-center text-center space-y-3">
-          <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-primary shadow-lg shadow-primary/10">
+          <div className="w-16 h-16 bg-card rounded-3xl flex items-center justify-center text-primary shadow-lg shadow-primary/10">
             <Target size={32} />
           </div>
           <h2 className="text-xl font-black text-primary uppercase tracking-tight">Simulador de Posicionamento</h2>
@@ -177,10 +177,10 @@ export default function RadiographicSimulator() {
             <button 
               key={exam.id}
               onClick={() => { setSelectedExam(exam); resetSimulator(); }}
-              className="w-full bg-white border border-border-main p-5 rounded-[2rem] flex items-center justify-between hover:bg-bg-app active:scale-[0.98] transition-all group"
+              className="w-full bg-card border border-border-main p-5 rounded-[2rem] flex items-center justify-between hover:bg-bg-app active:scale-[0.98] transition-all group"
             >
               <div className="flex items-center gap-4 text-left">
-                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:text-primary transition-colors">
+                <div className="w-12 h-12 bg-bg-app rounded-2xl flex items-center justify-center text-text-light group-hover:text-primary transition-colors">
                   <Target size={24} />
                 </div>
                 <div>
@@ -206,7 +206,7 @@ export default function RadiographicSimulator() {
         >
           <Target size={14} /> Mudar Exame
         </button>
-        <div className="flex bg-white rounded-full p-1 border border-border-main shadow-sm">
+        <div className="flex bg-card rounded-full p-1 border border-border-main shadow-sm">
           <button 
             onClick={() => { setMode('study'); resetSimulator(); }}
             className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${mode === 'study' ? 'bg-primary text-white' : 'text-text-light'}`}
@@ -223,7 +223,7 @@ export default function RadiographicSimulator() {
       </div>
 
       {/* Visual Simulation Area */}
-      <div className="relative aspect-square w-full bg-slate-100 rounded-[3rem] border-4 border-white shadow-xl overflow-hidden group">
+      <div className="relative aspect-square w-full bg-bg-app rounded-[3rem] border-4 border-card shadow-xl overflow-hidden group">
         {/* Patient Representation (Simplified SVG) */}
         <div 
           className="absolute inset-0 flex items-center justify-center transition-transform duration-500"
@@ -276,7 +276,7 @@ export default function RadiographicSimulator() {
       </div>
 
       {/* Control Panel */}
-      <div className="bg-white border border-border-main p-6 rounded-[2.5rem] shadow-sm space-y-6">
+      <div className="bg-card border border-border-main p-6 rounded-[2.5rem] shadow-sm space-y-6">
         <AnimatePresence mode="wait">
           {!showResults ? (
             <motion.div 
@@ -353,14 +353,14 @@ export default function RadiographicSimulator() {
                   <div></div>
                   <button 
                     onClick={() => setBeamY(prev => Math.max(0, prev - 5))}
-                    className="w-10 h-10 bg-slate-50 border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
+                    className="w-10 h-10 bg-card border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
                   >
                     <ChevronRight className="-rotate-90" size={20} />
                   </button>
                   <div></div>
                   <button 
                     onClick={() => setBeamX(prev => Math.max(0, prev - 5))}
-                    className="w-10 h-10 bg-slate-50 border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
+                    className="w-10 h-10 bg-card border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
                   >
                     <ChevronRight className="rotate-180" size={20} />
                   </button>
@@ -369,14 +369,14 @@ export default function RadiographicSimulator() {
                   </div>
                   <button 
                     onClick={() => setBeamX(prev => Math.min(100, prev + 5))}
-                    className="w-10 h-10 bg-slate-50 border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
+                    className="w-10 h-10 bg-card border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
                   >
                     <ChevronRight size={20} />
                   </button>
                   <div></div>
                   <button 
                     onClick={() => setBeamY(prev => Math.min(100, prev + 5))}
-                    className="w-10 h-10 bg-slate-50 border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
+                    className="w-10 h-10 bg-card border border-border-main rounded-xl flex items-center justify-center text-text-main shadow-sm active:bg-primary/10 active:text-primary transition-all"
                   >
                     <ChevronRight className="rotate-90" size={20} />
                   </button>
@@ -457,7 +457,7 @@ export default function RadiographicSimulator() {
                 <p className="text-sm text-text-light font-medium">Sua precisão técnica baseada nos parâmetros ideais.</p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl text-left space-y-3">
+              <div className="bg-bg-app p-4 rounded-2xl text-left space-y-3">
                 <p className="text-[10px] font-black text-text-light uppercase tracking-widest border-b border-slate-200 pb-2">Feedbacks:</p>
                 <div className="space-y-2">
                   {Math.abs(angle - selectedExam.idealAngle) > 5 && (
@@ -495,9 +495,9 @@ export default function RadiographicSimulator() {
       </div>
 
       {/* Safety Disclaimer */}
-      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
-        <XOctagon className="text-amber-500 shrink-0" size={20} />
-        <p className="text-[10px] text-amber-700 font-black leading-relaxed uppercase tracking-widest">
+      <div className="p-4 bg-orange-950/30 border border-orange-900/50 rounded-2xl flex gap-3">
+        <XOctagon className="text-orange-500 shrink-0" size={20} />
+        <p className="text-[10px] text-orange-700 font-black leading-relaxed uppercase tracking-widest">
           USO EDUCACIONAL: Este simulador é uma ferramenta de treinamento acadêmico. Nunca utilize para diagnóstico clínico.
         </p>
       </div>

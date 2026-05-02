@@ -5,13 +5,13 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-primary: #2D5B83;
-  --color-accent: #4A90E2;
-  --color-bg-app: #F0F4F8;
-  --color-card: #FFFFFF;
-  --color-text-main: #1E293B;
-  --color-text-light: #64748B;
-  --color-border-main: #E2E8F0;
+  --color-primary: #3B82F6;
+  --color-accent: #60A5FA;
+  --color-bg-app: #0F172A;
+  --color-card: #1E293B;
+  --color-text-main: #F8FAFC;
+  --color-text-light: #94A3B8;
+  --color-border-main: #334155;
   --color-danger: #EF4444;
 }
 

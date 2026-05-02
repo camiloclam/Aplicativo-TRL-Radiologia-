@@ -15,13 +15,13 @@ export default function RadiologicalCalculator() {
   return (
     <div className="space-y-6">
       {/* Tab Switcher */}
-      <div className="flex bg-white p-1 rounded-2xl border border-border-main shadow-sm">
+      <div className="flex bg-card p-1 rounded-2xl border border-border-main shadow-sm">
         {(['dose', 'factors', 'conversions'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`flex-1 py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              activeTab === tab ? 'bg-primary text-white shadow-md' : 'text-text-light hover:bg-slate-50'
+              activeTab === tab ? 'bg-primary text-white shadow-md' : 'text-text-light hover:bg-slate-800'
             }`}
           >
             {tab === 'dose' && 'Dose'}
@@ -110,7 +110,7 @@ function DoseCalculator() {
         </div>
 
         {dose !== null && (
-          <div className={`p-4 rounded-2xl flex flex-col items-center justify-center text-center space-y-1 transition-colors ${isDoseHigh ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+          <div className={`p-4 rounded-2xl flex flex-col items-center justify-center text-center space-y-1 transition-colors ${isDoseHigh ? 'bg-red-950/30 text-red-500' : 'bg-green-950/30 text-green-500'}`}>
             <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Dose Estimada</span>
             <div className="text-3xl font-black">{dose} <span className="text-sm">mGy</span></div>
             {isDoseHigh && (
@@ -122,7 +122,7 @@ function DoseCalculator() {
         )}
       </div>
 
-      <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-border-main">
+      <div className="p-4 bg-bg-app rounded-2xl border border-dashed border-border-main">
         <p className="text-[10px] text-text-light font-medium italic">
           * Nota: Os cálculos de dose são estimativas teóricas para fins educacionais e podem variar conforme o equipamento.
         </p>
@@ -170,18 +170,18 @@ function FactorsCalculator() {
         </div>
 
         <div className="space-y-3 pt-4">
-          <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
+          <div className="flex items-center justify-between p-4 bg-orange-950/30 rounded-2xl border border-orange-900/50">
             <div>
-              <div className="text-[10px] font-black uppercase text-primary tracking-widest">Aumentar Penetrabilidade</div>
-              <div className="text-sm font-bold text-text-main mt-1">kVp +15% <span className="text-primary">({kvpPlus})</span></div>
+              <div className="text-[10px] font-black uppercase text-orange-400 tracking-widest">Aumentar Penetrabilidade</div>
+              <div className="text-sm font-bold text-text-main mt-1">kVp +15% <span className="text-orange-400">({kvpPlus})</span></div>
             </div>
             <div className="text-right">
               <div className="text-[10px] font-black uppercase text-text-light tracking-widest">Compensar mAs</div>
-              <div className="text-sm font-bold text-text-main mt-1">mAs / 2 <span className="text-primary">({masHalf})</span></div>
+              <div className="text-sm font-bold text-text-main mt-1">mAs / 2 <span className="text-orange-400">({masHalf})</span></div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-border-main">
+          <div className="flex items-center justify-between p-4 bg-bg-app rounded-2xl border border-border-main">
             <div>
               <div className="text-[10px] font-black uppercase text-text-light tracking-widest">Diminuir contraste</div>
               <div className="text-sm font-bold text-text-main mt-1">kVp -15% <span className="text-primary">({kvpMinus})</span></div>
@@ -214,13 +214,13 @@ function UnitConverter() {
         <div className="flex gap-2 bg-bg-app p-1 rounded-xl">
           <button 
             onClick={() => setType('mgy-gy')}
-            className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${type === 'mgy-gy' ? 'bg-white shadow-sm text-primary' : 'text-text-light'}`}
+            className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${type === 'mgy-gy' ? 'bg-card shadow-sm text-primary' : 'text-text-light'}`}
           >
             mGy ↔ Gy
           </button>
           <button 
             onClick={() => setType('cm-mm')}
-            className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${type === 'cm-mm' ? 'bg-white shadow-sm text-primary' : 'text-text-light'}`}
+            className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${type === 'cm-mm' ? 'bg-card shadow-sm text-primary' : 'text-text-light'}`}
           >
             cm ↔ mm
           </button>

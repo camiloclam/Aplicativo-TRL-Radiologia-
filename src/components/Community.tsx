@@ -103,7 +103,7 @@ export default function Community({
             key={cat}
             onClick={() => setActiveCategory(cat)}
             className={`whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
-              activeCategory === cat ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-text-light border-border-main'
+              activeCategory === cat ? 'bg-primary text-white border-primary shadow-md' : 'bg-card text-text-light border-border-main'
             }`}
           >
             {cat}
@@ -147,11 +147,11 @@ function PostCard({ post }: PostCardProps) {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-[2rem] border border-border-main p-6 shadow-sm space-y-4"
+      className="bg-card rounded-[2rem] border border-border-main p-6 shadow-sm space-y-4"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+          <div className="w-8 h-8 rounded-full bg-bg-app flex items-center justify-center text-text-light">
             <User size={16} />
           </div>
           <div>
@@ -173,13 +173,13 @@ function PostCard({ post }: PostCardProps) {
         </p>
         
         {post.image && (
-          <div className="rounded-2xl overflow-hidden border border-border-main aspect-video bg-slate-50 flex items-center justify-center text-slate-300">
+          <div className="rounded-2xl overflow-hidden border border-border-main aspect-video bg-bg-app flex items-center justify-center text-text-light">
             <img src={post.image} className="w-full h-full object-cover" />
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-6 pt-2 border-t border-slate-50">
+      <div className="flex items-center gap-6 pt-2 border-t border-border-main">
         <button 
           onClick={() => setLiked(!liked)}
           className={`flex items-center gap-1.5 transition-colors ${liked ? 'text-red-500' : 'text-text-light'}`}
@@ -210,7 +210,7 @@ function ProfileSetup({ onComplete }: { onComplete: any }) {
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white rounded-[2.5rem] border border-border-main p-8 shadow-xl space-y-8 text-center"
+      className="bg-card rounded-[2.5rem] border border-border-main p-8 shadow-xl space-y-8 text-center"
     >
       <div className="space-y-3">
         <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center text-primary mx-auto shadow-inner">
@@ -236,7 +236,7 @@ function ProfileSetup({ onComplete }: { onComplete: any }) {
           <select 
             value={formData.area}
             onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value }))}
-            className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium bg-white"
+            className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium bg-card"
           >
             <option>Técnico</option>
             <option>Tecnólogo</option>
@@ -249,7 +249,7 @@ function ProfileSetup({ onComplete }: { onComplete: any }) {
           <select 
             value={formData.experience}
             onChange={(e) => setFormData(prev => ({ ...prev, experience: e.target.value }))}
-            className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium bg-white"
+            className="w-full card p-3 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-sm font-medium bg-card"
           >
             <option>Iniciante</option>
             <option>1-3 anos</option>
@@ -294,14 +294,14 @@ function NewPostModal({ onClose, onSave, userProfile }: any) {
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         exit={{ y: 100 }}
-        className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6"
+        className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 border border-border-main"
       >
         <div className="flex items-center gap-3 text-primary">
           <Share2 size={24} />
           <h3 className="text-lg font-black tracking-tight">Compartilhar Caso</h3>
         </div>
 
-        <div className="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3">
+        <div className="p-4 bg-red-950/30 rounded-2xl border border-red-900/50 flex gap-3">
           <ShieldAlert className="text-red-500 shrink-0" size={20} />
           <p className="text-[10px] text-red-700 font-bold leading-relaxed uppercase tracking-wider">
             ANONIMIZAÇÃO OBRIGATÓRIA: Remova todos os dados pessoais do paciente antes de postar imagens.
@@ -314,7 +314,7 @@ function NewPostModal({ onClose, onSave, userProfile }: any) {
             <select 
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full card p-3 outline-none text-sm font-medium bg-white"
+              className="w-full card p-3 outline-none text-sm font-medium bg-card"
             >
               <option>Tórax</option>
               <option>Ortopedia</option>
@@ -337,7 +337,7 @@ function NewPostModal({ onClose, onSave, userProfile }: any) {
 
           <div className="space-y-2">
              <label className="text-[10px] font-black text-text-light uppercase tracking-widest pl-1">Imagem Técnica</label>
-             <div className="relative aspect-video rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center hover:border-primary transition-colors overflow-hidden bg-slate-50">
+             <div className="relative aspect-video rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center hover:border-primary transition-colors overflow-hidden bg-bg-app">
                {image ? (
                  <img src={image} className="w-full h-full object-cover" />
                ) : (
