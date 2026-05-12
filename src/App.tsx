@@ -135,6 +135,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [theme, setTheme] = useState<string>(() => {
+    return localStorage.getItem('trl_theme') || 'default';
+  });
+
   // Professional / Networking State
   const [userProfile, setUserProfile] = useState<{ name: string, area: string, experience: string, photo?: string } | null>(() => {
     const saved = localStorage.getItem('trl_user_profile');
@@ -178,6 +182,15 @@ export default function App() {
     localStorage.setItem('trl_daily_reports', JSON.stringify(dailyReports));
   }, [dailyReports]);
 
+  useEffect(() => {
+    localStorage.setItem('trl_theme', theme);
+    if (theme === 'default') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [theme]);
+
   // Navigation and Selection
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -194,6 +207,35 @@ export default function App() {
   const [videoLinkData, setVideoLinkData] = useState({ title: '', url: '' });
   const [studyInputData, setStudyInputData] = useState({ title: '', url: '' });
   const [imageToCrop, setImageToCrop] = useState<{ src: string, type: 'main' | 'user', index?: number } | null>(null);
+  const [anatomicalBg, setAnatomicalBg] = useState<string | null>(null);
+  const anatomicalBgInputRef = useRef<HTMLInputElement>(null);
+  const anatomicalContainerRef = useRef<HTMLDivElement>(null);
+
+  // Default positions for anatomical points (percentage-based for responsiveness)
+  const defaultPoints = [
+    { id: 'cranio', categoryId: 'cranio', x: 50, y: 15, icon: 'Brain' },
+    { id: 'torax', categoryId: 'torax', x: 40, y: 35, icon: 'Stethoscope' },
+    { id: 'coluna', categoryId: 'coluna', x: 60, y: 35, icon: 'PersonStanding' },
+    { id: 'membros-superiores-l', categoryId: 'membros-superiores', x: 20, y: 40, icon: 'Hand' },
+    { id: 'membros-superiores-r', categoryId: 'membros-superiores', x: 80, y: 40, icon: 'Hand' },
+    { id: 'membros-inferiores-l', categoryId: 'membros-inferiores', x: 35, y: 80, icon: 'Footprints' },
+    { id: 'membros-inferiores-r', categoryId: 'membros-inferiores', x: 65, y: 80, icon: 'Footprints' },
+  ];
+
+  const [anatomicalPoints, setAnatomicalPoints] = useState(defaultPoints);
+
+  const handleAnatomicalBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      if (b64) setAnatomicalBg(b64);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   // Derived State
   const filteredExams = useMemo(() => {
@@ -606,92 +648,23 @@ export default function App() {
                 />
               </div>
 
-              {/* Skeleton Shortcut */}
-              <button 
-                onClick={() => setCurrentView('skeleton')}
-                className="w-full group relative overflow-hidden h-32 rounded-2xl bg-primary shadow-lg shadow-primary/20 flex items-center"
-              >
-                <div className="absolute right-0 top-0 h-full opacity-10 group-hover:scale-110 transition-transform">
-                  <PersonStanding size={120} className="text-white" />
-                </div>
-                <div className="p-6 relative z-10 text-left">
-                  <h3 className="text-white font-bold text-lg">Corpo Anatômico</h3>
-                  <p className="text-white/70 text-sm max-w-[200px]">Toque nas regiões do esqueleto para ver os exames</p>
-                </div>
-              </button>
-
-              {/* Modules Quick Access */}
-              <section className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => setCurrentView('tools')}
-                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                    <Calculator size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Calculadoras</span>
-                </button>
-                <button 
-                  onClick={() => setCurrentView('daily-reports')}
-                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-orange-950/30 text-orange-400 flex items-center justify-center">
-                    <ClipboardList size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Relatório diário</span>
-                </button>
-                <button 
-                  onClick={() => setCurrentView('simulator')}
-                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-green-950/30 text-green-400 flex items-center justify-center">
-                    <Target size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Simulador</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    const kitGripe = categories.find(c => c.id === 'kit-gripe');
-                    if (kitGripe) navigateToCategory(kitGripe);
-                  }}
-                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-red-950/30 text-red-400 flex items-center justify-center">
-                    <Activity size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Kit Gripe</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    const densito = categories.find(c => c.id === 'densitometria');
-                    if (densito) navigateToCategory(densito);
-                  }}
-                  className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-blue-950/30 text-blue-400 flex items-center justify-center">
-                    <Accessibility size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-main line-clamp-1">Densitometria</span>
-                </button>
-              </section>
-
-              {/* Categories Grid */}
+              {/* Categories Grid (Main Navigation) */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[11px] font-bold text-text-light uppercase tracking-[0.1em]">Regiões</h2>
+                  <h2 className="text-[11px] font-bold text-text-light uppercase tracking-[0.1em]">Regiões e Diagnósticos</h2>
                   <button onClick={() => setCurrentView('add-category')} className="text-primary hover:text-accent p-1 transition-colors">
                     <PlusCircle size={20} />
                   </button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3">
-                  {categories.map((cat) => {
+                  {categories.filter(c => c.id !== 'kit-gripe' && c.id !== 'densitometria').map((cat) => {
                     const Icon = ICON_MAP[cat.icon as keyof typeof ICON_MAP] || Accessibility;
                     return (
-                      <div key={cat.id} className="relative group">
+                      <div key={cat.id} className="relative group text-center">
                          <button 
                           onClick={() => navigateToCategory(cat)}
-                          className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-800 transition-all text-center border-border-main"
+                          className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-800 transition-all border-border-main"
                         >
                           <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
                             <Icon size={24} />
@@ -715,11 +688,115 @@ export default function App() {
                       </div>
                     );
                   })}
+
+                  {/* Integrated Kit Gripe */}
+                  <button 
+                    onClick={() => {
+                      const kitGripe = categories.find(c => c.id === 'kit-gripe');
+                      if (kitGripe) navigateToCategory(kitGripe);
+                    }}
+                    className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-800 transition-all border-border-main group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-red-950/30 text-red-400 flex items-center justify-center group-hover:bg-red-900/40 transition-colors">
+                      <Activity size={24} />
+                    </div>
+                    <span className="font-semibold text-text-main text-sm">Kit Gripe</span>
+                  </button>
+
+                  {/* Integrated Densitometria */}
+                  <button 
+                    onClick={() => {
+                      const densito = categories.find(c => c.id === 'densitometria');
+                      if (densito) navigateToCategory(densito);
+                    }}
+                    className="w-full card p-5 flex flex-col items-center gap-3 active:scale-[0.98] active:bg-slate-800 transition-all border-border-main group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-blue-950/30 text-blue-400 flex items-center justify-center group-hover:bg-blue-900/40 transition-colors">
+                      <Accessibility size={24} />
+                    </div>
+                    <span className="font-semibold text-text-main text-sm">Densitometria</span>
+                  </button>
                 </div>
               </div>
 
+              {/* Bottom Tools Section */}
+              <div className="space-y-4 pt-4 border-t border-border-main">
+                <h2 className="text-[11px] font-bold text-text-light uppercase tracking-[0.1em]">Ferramentas e Organização</h2>
+
+                {/* Skeleton Shortcut (Corpo Anatômico) */}
+                <button 
+                  onClick={() => setCurrentView('skeleton')}
+                  className="w-full group relative overflow-hidden h-28 rounded-2xl bg-card border border-border-main shadow-sm flex items-center active:scale-[0.98] transition-all"
+                >
+                  <div className="absolute right-0 top-0 h-full opacity-10 group-hover:scale-110 transition-transform text-primary pr-4 flex items-center">
+                    <PersonStanding size={100} />
+                  </div>
+                  <div className="p-6 relative z-10 text-left">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <Map size={18} />
+                      </div>
+                      <h3 className="text-text-main font-bold text-base">Corpo Anatômico</h3>
+                    </div>
+                    <p className="text-text-light text-xs font-medium">Toque nas regiões para filtrar exames</p>
+                  </div>
+                </button>
+
+                {/* Modules Grid */}
+                <section className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setCurrentView('tools')}
+                    className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all text-center"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <Calculator size={20} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-main">Calculadoras</span>
+                  </button>
+                  <button 
+                    onClick={() => setCurrentView('daily-reports')}
+                    className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all text-center"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-orange-950/30 text-orange-400 flex items-center justify-center">
+                      <ClipboardList size={20} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-main">Relatório diário</span>
+                  </button>
+                  <button 
+                    onClick={() => setCurrentView('simulator')}
+                    className="bg-card border border-border-main p-4 rounded-2xl flex flex-col items-center gap-2 active:scale-95 transition-all text-center"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-green-950/30 text-green-400 flex items-center justify-center">
+                      <Target size={20} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-main">Simulador</span>
+                  </button>
+                  <div className="bg-card border border-border-main p-3 rounded-2xl flex flex-col items-center gap-2 transition-all">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-text-light mb-1">Tema Visual</span>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {[
+                        { id: 'default', color: 'bg-blue-500' },
+                        { id: 'light', color: 'bg-white' },
+                        { id: 'emerald', color: 'bg-emerald-500' },
+                        { id: 'rose', color: 'bg-rose-500' },
+                        { id: 'amber', color: 'bg-amber-500' },
+                        { id: 'violet', color: 'bg-violet-500' },
+                        { id: 'slate', color: 'bg-slate-500' }
+                      ].map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => setTheme(t.id)}
+                          className={`w-3.5 h-3.5 rounded-full ${t.color} border-2 ${theme === t.id ? 'border-text-main scale-110' : 'border-transparent'} transition-all`}
+                          title={t.id}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+
               {/* Quick Study Card */}
-              <div className="card p-5 bg-card border-l-4 border-l-primary shadow-sm">
+              <div className="card p-5 bg-card border-l-4 border-l-primary shadow-sm mt-4">
                 <div className="flex items-start gap-4">
                   <div className="p-3 bg-primary/5 rounded-xl text-primary">
                     <BookOpen size={24} />
@@ -869,7 +946,7 @@ export default function App() {
                     accept="image/*" 
                     onChange={handleFileUpload} 
                   />
-                  <div className="aspect-video bg-bg-app rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center text-text-light overflow-hidden relative group shadow-sm transition-all hover:border-primary/30">
+                  <div className="aspect-square bg-bg-app rounded-2xl border-2 border-dashed border-border-main flex items-center justify-center text-text-light overflow-hidden relative group shadow-sm transition-all hover:border-primary/30">
                     {selectedExam.imageUrl ? (
                       <div className="relative w-full h-full">
                         <img src={selectedExam.imageUrl} alt={selectedExam.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1095,80 +1172,110 @@ export default function App() {
               exit="exit"
               className="space-y-6"
             >
-              <div className="bg-card rounded-3xl p-8 shadow-lg border border-border-main relative min-h-[600px] flex flex-col items-center overflow-hidden">
-                 <p className="text-center text-text-light text-[10px] font-black uppercase tracking-[0.2em] mb-8 relative z-10">Corpo Anatômico</p>
-                 
-                 {/* Skeleton Background Integration */}
-                 <div className="relative w-full max-w-[300px] aspect-[1/2] rounded-3xl flex flex-col items-center justify-between p-8 overflow-hidden">
-                    <img 
-                      src="https://images.unsplash.com/photo-1526662095394-1994625b64f3?q=80&w=800" 
-                      alt="Skeleton Background" 
-                      className="absolute inset-0 w-full h-full object-contain opacity-20 grayscale pointer-events-none"
-                      referrerPolicy="no-referrer"
-                    />
-                    
-                    {/* Head */}
-                    <button 
-                      onClick={() => navigateToCategory(categories.find(c => c.id === 'cranio')!)}
-                      className="w-16 h-16 rounded-full bg-card/80 backdrop-blur-sm border border-border-main shadow-lg flex items-center justify-center text-text-light hover:text-primary hover:border-primary hover:shadow-primary/20 hover:scale-110 transition-all relative z-10"
-                    >
-                      <Brain size={24} />
-                    </button>
-
-                    {/* Spine/Torax */}
-                    <div className="flex gap-4">
+              <div className="bg-card rounded-[2.5rem] p-6 shadow-xl border border-border-main relative flex flex-col items-center overflow-hidden max-w-[400px] mx-auto min-h-[500px]">
+                  <div className="w-full flex items-center justify-between mb-6 relative z-10">
+                    <p className="text-text-light text-[9px] font-black uppercase tracking-[0.2em]">Corpo Anatômico</p>
+                    <div className="flex gap-2">
+                       <button 
+                        onClick={() => setAnatomicalPoints(defaultPoints)}
+                        className="p-2 bg-text-light/5 text-text-light rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-text-light/10 transition-all"
+                        title="Resetar Posições"
+                      >
+                         Reset
+                      </button>
                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'torax')!)}
-                         className="w-16 h-24 rounded-2xl bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
+                        onClick={() => anatomicalBgInputRef.current?.click()}
+                        className="p-2 bg-primary/10 text-primary rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/20 transition-all font-mono"
                       >
-                         <Stethoscope size={24} />
-                      </button>
-                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'coluna')!)}
-                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary hover:border-primary transition-all"
-                      >
-                         <PersonStanding size={24} />
+                        <ImageIcon size={14} /> Fundo
                       </button>
                     </div>
+                    <input 
+                      type="file" 
+                      ref={anatomicalBgInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleAnatomicalBgUpload} 
+                    />
+                  </div>
+                 
+                  {/* Skeleton Background Integration */}
+                  <div 
+                    ref={anatomicalContainerRef}
+                    className="relative w-full max-w-[320px] aspect-[1/1.8] rounded-[2.5rem] bg-bg-app border border-border-main shadow-inner transition-all duration-500 overflow-hidden"
+                  >
+                     <img 
+                       src={anatomicalBg || "https://images.unsplash.com/photo-1526662095394-1994625b64f3?q=80&w=800"} 
+                       alt="Skeleton Background" 
+                       className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${!anatomicalBg ? 'opacity-20 grayscale' : 'opacity-100'}`}
+                       referrerPolicy="no-referrer"
+                     />
+                     <div className={`absolute inset-0 bg-gradient-to-t from-bg-app via-transparent to-transparent ${anatomicalBg ? 'opacity-40' : 'opacity-0'}`} />
+                    
+                     {/* Draggable Points */}
+                     {anatomicalPoints.map((point) => {
+                       const IconComponent = 
+                        point.icon === 'Brain' ? Brain :
+                        point.icon === 'Stethoscope' ? Stethoscope :
+                        point.icon === 'PersonStanding' ? PersonStanding :
+                        point.icon === 'Hand' ? Hand :
+                        point.icon === 'Footprints' ? Footprints : Brain;
 
-                    {/* Arms */}
-                     <div className="absolute top-28 left-0 flex flex-col -ml-12 items-center rotate-[20deg]">
-                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-superiores')!)}
-                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
-                      >
-                         <Hand size={24} />
-                      </button>
-                    </div>
-                    <div className="absolute top-28 right-0 flex flex-col -mr-12 items-center rotate-[-20deg]">
-                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-superiores')!)}
-                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
-                      >
-                         <Hand size={24} />
-                      </button>
-                    </div>
+                       return (
+                         <motion.button
+                           key={point.id}
+                           drag
+                           dragConstraints={anatomicalContainerRef}
+                           dragElastic={0}
+                           dragMomentum={false}
+                           onDragEnd={(_, info) => {
+                             if (!anatomicalContainerRef.current) return;
+                             const rect = anatomicalContainerRef.current.getBoundingClientRect();
+                             
+                             // Calculate new percentage position based on pointer release coordinates
+                             const relX = ((info.point.x - rect.left) / rect.width) * 100;
+                             const relY = ((info.point.y - rect.top) / rect.height) * 100;
 
-                    {/* Legs */}
-                    <div className="flex gap-8 mt-4">
-                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-inferiores')!)}
-                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
-                      >
-                         <Footprints size={24} />
-                      </button>
-                       <button 
-                         onClick={() => navigateToCategory(categories.find(c => c.id === 'membros-inferiores')!)}
-                         className="w-12 h-32 rounded-full bg-card border border-border-main shadow-sm flex items-center justify-center text-text-light hover:text-primary transition-all"
-                      >
-                         <Footprints size={24} />
-                      </button>
-                    </div>
-                 </div>
+                             setAnatomicalPoints(prev => prev.map(p => 
+                               p.id === point.id ? { 
+                                 ...p, 
+                                 x: Math.max(0, Math.min(100, relX)), 
+                                 y: Math.max(0, Math.min(100, relY)) 
+                               } : p
+                             ));
+                           }}
+                           onClick={() => {
+                             const category = categories.find(c => c.id === point.categoryId);
+                             if (category) navigateToCategory(category);
+                           }}
+                           className="absolute z-10 group touch-none"
+                           style={{ 
+                             left: `${point.x}%`, 
+                             top: `${point.y}%`,
+                             x: "-50%",
+                             y: "-50%"
+                           }}
+                           whileDrag={{ scale: 1.2, zIndex: 50 }}
+                         >
+                           <div className={`
+                             ${point.icon === 'Hand' ? 'w-8 h-8' : 'w-10 h-10'}
+                             rounded-full bg-zinc-950/80 backdrop-blur-md border-2 border-white/20 shadow-xl flex items-center justify-center text-white 
+                             group-hover:text-primary group-hover:border-primary group-hover:bg-zinc-900 transition-all
+                           `}>
+                             <IconComponent size={point.icon === 'Hand' ? 14 : 18} className="group-hover:scale-110 transition-transform" />
+                           </div>
+                           {/* Hint for dragging */}
+                           <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                             <p className="text-[7px] font-black uppercase text-primary bg-white px-1.5 py-0.5 rounded shadow-sm">Mover</p>
+                           </div>
+                         </motion.button>
+                       );
+                     })}
+                  </div>
 
-                 <div className="mt-12 text-center">
-                    <p className="text-text-light text-xs font-bold italic">Toque em uma região para filtrar os exames.</p>
-                 </div>
+                  <div className="mt-8 text-center px-4 max-w-[300px]">
+                     <p className="text-text-light text-[9px] font-black uppercase tracking-[0.2em] leading-relaxed opacity-60">Toque para filtrar exames ou arraste para reposicionar os ícones</p>
+                  </div>
               </div>
             </motion.div>
           )}
